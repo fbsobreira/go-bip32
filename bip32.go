@@ -2,11 +2,16 @@ package bip32
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/hex"
 	"errors"
+	"math/big"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -42,6 +47,12 @@ var (
 
 	// ErrInvalidPublicKey is returned when a derived public key is invalid
 	ErrInvalidPublicKey = errors.New("Invalid public key")
+
+	// ErrInvalidPath is returned when a path is invalid
+	ErrInvalidPath = errors.New("Invalid path")
+
+	// ErrInvalidIndex is returned when an index is invalid
+	ErrInvalidIndex = errors.New("Invalid index")
 )
 
 // Key represents a bip32 extended key
@@ -283,4 +294,63 @@ func NewSeed() ([]byte, error) {
 	s := make([]byte, 256)
 	_, err := rand.Read(s)
 	return s, err
+}
+
+// PublicKeyExtended expand PublicKey and return
+func (key *Key) PublicKeyExtended() []byte {
+	x, y := ExpandPublicKey(key.PublicKey().Key)
+	four, _ := hex.DecodeString("04")
+	paddedKey := append(four, append(x.Bytes(), y.Bytes()...)...)
+	return paddedKey
+}
+
+// DerivePath Generate BIP44 account
+func (key *Key) DerivePath(path string) (*Key, error) {
+
+	if path == "m" || path == "M" || path == "m'" || path == "M'" {
+		return key, nil
+	}
+
+	entries := strings.Split(path, "/")
+	hdKey := key
+	for index, value := range entries {
+		if index == 0 {
+			if value != "m" {
+				return nil, ErrInvalidPath
+			}
+			continue
+		}
+		hardened := (len(value) > 1) && (value[len(value)-1] == '\'')
+		numValue := value
+		if hardened {
+			numValue = value[:len(value)-1]
+		}
+		childID, err := strconv.Atoi(numValue)
+		if err != nil {
+			return nil, err
+		}
+		childIndex := uint32(childID)
+
+		if hardened {
+			childIndex += FirstHardenedChild
+		}
+
+		hdKey, _ = hdKey.NewChildKey(childIndex)
+	}
+
+	return hdKey, nil
+}
+
+// ToECDSA converts key to ecdsa public and private key pair
+func (key *Key) ToECDSA() (*ecdsa.PrivateKey, error) {
+	p := new(ecdsa.PrivateKey)
+	c := elliptic.P256()
+	p.PublicKey.Curve = c
+	p.D = new(big.Int).SetBytes(key.Key)
+	p.PublicKey.X, p.PublicKey.Y = c.ScalarBaseMult(key.Key)
+
+	if !c.IsOnCurve(p.PublicKey.X, p.PublicKey.Y) {
+		return nil, errors.New("invalid ecdsa key")
+	}
+	return p, nil
 }

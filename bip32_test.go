@@ -1,6 +1,7 @@
 package bip32
 
 import (
+	"crypto/elliptic"
 	"encoding/hex"
 	"testing"
 
@@ -106,6 +107,25 @@ func TestBip32TestVectors(t *testing.T) {
 	testVectorKeyPairs(t, vector1)
 	testVectorKeyPairs(t, vector2)
 	testVectorKeyPairs(t, vector3)
+}
+
+func TestKey_ToECDSA(t *testing.T) {
+	seed, _ := hex.DecodeString("01664c242e472efc54aab98dfbb5950445c65a9d35e6f7e08763f95eaa57d19b31735caa70ab50b7e27a4d2681c49321a90815b3105e69de067b4f18b142de67")
+	masterKey, err := NewMasterKey(seed)
+	// xprv9s21ZrQH143K3FohcoQmgmqq5naGPBwfmuaBFJ3vYHS7h48LjxEMHKtx4coEK37GNN8AgVhgQmMNU99PrQXR63afM3jL4UfjpptZdcM4aop
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	private, err := masterKey.ToECDSA()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := elliptic.P256()
+	if !c.IsOnCurve(private.PublicKey.X, private.PublicKey.Y) {
+		t.Errorf("ecdsa public key invalid: %s", err)
+	}
 }
 
 func testVectorKeyPairs(t *testing.T, vector testMasterKey) {

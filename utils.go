@@ -105,8 +105,8 @@ func publicKeyForPrivateKey(key []byte) []byte {
 }
 
 func addPublicKeys(key1 []byte, key2 []byte) []byte {
-	x1, y1 := expandPublicKey(key1)
-	x2, y2 := expandPublicKey(key2)
+	x1, y1 := ExpandPublicKey(key1)
+	x2, y2 := ExpandPublicKey(key2)
 	return compressPublicKey(curve.Add(x1, y1, x2, y2))
 }
 
@@ -143,8 +143,8 @@ func compressPublicKey(x *big.Int, y *big.Int) []byte {
 	return key.Bytes()
 }
 
-// As described at https://crypto.stackexchange.com/a/8916
-func expandPublicKey(key []byte) (*big.Int, *big.Int) {
+// ExpandPublicKey As described at https://crypto.stackexchange.com/a/8916
+func ExpandPublicKey(key []byte) (*big.Int, *big.Int) {
 	Y := big.NewInt(0)
 	X := big.NewInt(0)
 	X.SetBytes(key[1:])
@@ -180,7 +180,7 @@ func validatePrivateKey(key []byte) error {
 }
 
 func validateChildPublicKey(key []byte) error {
-	x, y := expandPublicKey(key)
+	x, y := ExpandPublicKey(key)
 
 	if x.Sign() == 0 || y.Sign() == 0 {
 		return ErrInvalidPublicKey
